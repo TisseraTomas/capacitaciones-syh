@@ -13,7 +13,8 @@
     </header>
 
     <main class="flex-1 flex flex-col px-4 py-6 max-w-md mx-auto w-full">
-      <div v-if="preguntas.length === 0" class="flex-1 flex items-center justify-center text-slate-400">
+      <div v-if="preguntas.length === 0" class="flex-1 flex flex-col items-center justify-center text-slate-400">
+        <svg class="animate-spin h-8 w-8 mb-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
         <p>Cargando preguntas...</p>
       </div>
 
@@ -39,13 +40,14 @@
         <div class="mt-6">
           <button
             @click="siguientePregunta"
-            class="w-full py-4 text-lg font-semibold rounded-xl transition"
+            class="w-full py-4 text-lg font-semibold rounded-xl transition flex items-center justify-center gap-2"
             :class="respuestaSeleccionada
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-slate-200 text-slate-400 cursor-not-allowed'"
-            :disabled="!respuestaSeleccionada"
+            :disabled="!respuestaSeleccionada || enviando"
           >
-            {{ esUltima ? 'Finalizar' : 'Siguiente' }}
+            <svg v-if="enviando" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+            {{ enviando ? 'Enviando...' : (esUltima ? 'Finalizar' : 'Siguiente') }}
           </button>
         </div>
       </template>
@@ -63,6 +65,7 @@ const router = useRouter()
 const preguntas = ref([])
 const currentIndex = ref(0)
 const respuestas = ref({})
+const enviando = ref(false)
 
 const preguntaActual = computed(() => preguntas.value[currentIndex.value] || {})
 const respuestaSeleccionada = computed(() => respuestas.value[preguntaActual.value.id])
@@ -98,6 +101,7 @@ async function enviarIntento() {
     })),
   }
 
+  enviando.value = true
   try {
     const res = await axios.post(`/api/c/${route.params.token}/intento`, payload, {
       headers: { Authorization: `Bearer ${token}` },
@@ -112,6 +116,8 @@ async function enviarIntento() {
     } else {
       alert(errData?.mensaje || 'Error al enviar respuestas')
     }
+  } finally {
+    enviando.value = false
   }
 }
 

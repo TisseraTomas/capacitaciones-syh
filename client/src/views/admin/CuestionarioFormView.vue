@@ -54,7 +54,11 @@
 
         <input ref="importInput" type="file" accept=".csv,.docx" class="hidden" @change="handleImportar" />
 
-        <div v-if="importError" class="p-3 bg-red-100 text-red-700 rounded-lg text-sm">{{ importError }}</div>
+        <div v-if="cargandoDatos" class="flex items-center justify-center py-12 text-slate-400">
+        <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        <span>Cargando formulario...</span>
+      </div>
+      <div v-if="importError" class="p-3 bg-red-100 text-red-700 rounded-lg text-sm">{{ importError }}</div>
         <div v-if="importOk" class="p-3 bg-emerald-100 text-emerald-700 rounded-lg text-sm">{{ importOk }}</div>
 
         <div v-for="(p, idx) in form.preguntas" :key="idx" class="border border-slate-200 rounded-lg p-4 space-y-3">
@@ -121,12 +125,16 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../../composables/useApi'
 import mammoth from 'mammoth'
+import { useToast } from '../../composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
 
 const route = useRoute()
 const router = useRouter()
 const esEdicion = route.name === 'CuestionarioDetalle'
 const empresas = ref([])
 const loading = ref(false)
+const cargandoDatos = ref(true)
 const error = ref('')
 const importInput = ref(null)
 const importError = ref('')
@@ -354,6 +362,40 @@ async function handleImportar(e) {
 
 async function handleSubmit() {
   error.value = ''
+
+  if (!form.value.titulo.trim()) {
+    error.value = 'El título es requerido'
+    toastError(error.value)
+    return
+  }
+  if (!form.value.empresaId) {
+    error.value = 'Debe seleccionar una empresa'
+    toastError(error.value)
+    return
+  }
+  if (form.value.preguntas.length === 0) {
+    error.value = 'Debe incluir al menos una pregunta'
+    toastError(error.value)
+    return
+  }
+  for (const p of form.value.preguntas) {
+    if (!p.texto.trim()) {
+      error.value = 'Todas las preguntas deben tener texto'
+      toastError(error.value)
+      return
+    }
+    if (p.opciones.length < 2) {
+      error.value = `La pregunta "${p.texto}" debe tener al menos 2 opciones`
+      toastError(error.value)
+      return
+    }
+    if (!p.opciones.some(o => o.esCorrecta)) {
+      error.value = `La pregunta "${p.texto}" debe tener una respuesta correcta`
+      toastError(error.value)
+      return
+    }
+  }
+
   loading.value = true
   try {
     if (esEdicion) {
@@ -363,38 +405,45 @@ async function handleSubmit() {
         porcentajeAprobacion: form.value.porcentajeAprobacion,
         intentosPermitidos: form.value.intentosPermitidos,
       })
+      toastSuccess('Cuestionario actualizado correctamente')
     } else {
       await api.post('/admin/cuestionarios', form.value)
+      toastSuccess('Cuestionario creado correctamente')
     }
     router.push('/admin/cuestionarios')
   } catch (e) {
     error.value = e.message
+    toastError(e.message)
   } finally {
     loading.value = false
   }
 }
 
 onMounted(async () => {
-  empresas.value = await api.get('/admin/empresas')
-  if (esEdicion && route.params.id) {
-    const c = await api.get(`/admin/cuestionarios/${route.params.id}`)
-    intentosIlimitados.value = c.intentosPermitidos === 0
-    form.value = {
-      titulo: c.titulo,
-      descripcion: c.descripcion || '',
-      empresaId: c.empresaId,
-      porcentajeAprobacion: c.porcentajeAprobacion,
-      intentosPermitidos: c.intentosPermitidos,
-      preguntas: c.preguntas.map(p => ({
-        texto: p.texto,
-        tipo: p.tipo,
-        orden: p.orden,
-        opciones: p.opciones.map(o => ({
-          texto: o.texto,
-          esCorrecta: o.esCorrecta,
+  try {
+    empresas.value = await api.get('/admin/empresas')
+    if (esEdicion && route.params.id) {
+      const c = await api.get(`/admin/cuestionarios/${route.params.id}`)
+      intentosIlimitados.value = c.intentosPermitidos === 0
+      form.value = {
+        titulo: c.titulo,
+        descripcion: c.descripcion || '',
+        empresaId: c.empresaId,
+        porcentajeAprobacion: c.porcentajeAprobacion,
+        intentosPermitidos: c.intentosPermitidos,
+        preguntas: c.preguntas.map(p => ({
+          texto: p.texto,
+          tipo: p.tipo,
+          orden: p.orden,
+          opciones: p.opciones.map(o => ({
+            texto: o.texto,
+            esCorrecta: o.esCorrecta,
+          })),
         })),
-      })),
+      }
     }
+  } finally {
+    cargandoDatos.value = false
   }
 })
 </script>

@@ -1,5 +1,7 @@
 import prisma from '../utils/prisma.js';
 
+const DNI_REGEX = /^\d{7,8}$/;
+
 export async function list(req, res) {
   try {
     const { empresaId } = req.params;
@@ -34,6 +36,9 @@ export async function create(req, res) {
     if (!dni || !dni.trim()) {
       return res.status(400).json({ error: 'El DNI es requerido' });
     }
+    if (!DNI_REGEX.test(dni.trim())) {
+      return res.status(400).json({ error: 'El DNI debe contener entre 7 y 8 dígitos numéricos' });
+    }
 
     const existe = await prisma.trabajador.findUnique({ where: { dni: dni.trim() } });
     if (existe) {
@@ -66,6 +71,7 @@ export async function bulkCreate(req, res) {
     let creados = 0;
     for (const t of trabajadores) {
       if (!t.nombreCompleto || !t.dni) continue;
+      if (!DNI_REGEX.test(t.dni.trim())) continue;
       const existe = await prisma.trabajador.findUnique({ where: { dni: t.dni.trim() } });
       if (existe) continue;
       await prisma.trabajador.create({

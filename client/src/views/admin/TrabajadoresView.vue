@@ -30,7 +30,12 @@
     </div>
 
     <div class="card">
+      <div v-if="cargandoDatos" class="flex items-center justify-center py-12 text-slate-400">
+        <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        <span>Cargando trabajadores...</span>
+      </div>
       <DataTable
+        v-else
         :columns="[
           { key: 'nombreCompleto', label: 'Nombre Completo' },
           { key: 'dni', label: 'DNI' },
@@ -57,7 +62,7 @@
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-slate-700 mb-1">DNI</label>
-            <input v-model="form.dni" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+            <input v-model="form.dni" type="text" inputmode="numeric" pattern="\d{7,8}" maxlength="8" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
           </div>
           <p v-if="error" class="text-red-500 text-sm mb-3">{{ error }}</p>
           <div class="flex justify-end gap-3">
@@ -95,6 +100,9 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../../composables/useApi'
 import DataTable from '../../components/admin/DataTable.vue'
+import { useToast } from '../../composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
 
 const route = useRoute()
 const empresa = ref(null)
@@ -102,6 +110,7 @@ const trabajadores = ref([])
 const showModal = ref(false)
 const showCsvModal = ref(false)
 const loading = ref(false)
+const cargandoDatos = ref(true)
 const error = ref('')
 const form = ref({ nombreCompleto: '', dni: '' })
 const fileInput = ref(null)
@@ -126,14 +135,24 @@ watch(busqueda, () => {
 
 async function handleCreate() {
   error.value = ''
+
+  const dniLimpio = form.value.dni.trim()
+  if (!/^\d{7,8}$/.test(dniLimpio)) {
+    error.value = 'El DNI debe contener entre 7 y 8 dígitos numéricos'
+    toastError(error.value)
+    return
+  }
+
   loading.value = true
   try {
-    await api.post(`/admin/empresas/${route.params.empresaId}/trabajadores`, form.value)
+    await api.post(`/admin/empresas/${route.params.empresaId}/trabajadores`, { ...form.value, dni: dniLimpio })
     showModal.value = false
     form.value = { nombreCompleto: '', dni: '' }
     await load()
+    toastSuccess('Trabajador creado correctamente')
   } catch (e) {
     error.value = e.message
+    toastError(e.message)
   } finally {
     loading.value = false
   }
@@ -144,8 +163,9 @@ async function confirmDelete(row) {
   try {
     await api.delete(`/admin/trabajadores/${row.id}`)
     await load()
+    toastSuccess('Trabajador eliminado')
   } catch (e) {
-    alert(e.message)
+    toastError(e.message)
   }
 }
 
@@ -221,5 +241,11 @@ function handleCsv(e) {
   })()
 }
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    await load()
+  } finally {
+    cargandoDatos.value = false
+  }
+})
 </script>

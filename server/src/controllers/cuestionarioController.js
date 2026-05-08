@@ -2,6 +2,7 @@ import prisma from '../utils/prisma.js';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret';
+const DNI_REGEX = /^\d{7,8}$/;
 
 export async function list(req, res) {
   try {
@@ -91,6 +92,17 @@ export async function create(req, res) {
     }
     if (!Array.isArray(preguntas) || preguntas.length === 0) {
       return res.status(400).json({ error: 'Debe incluir al menos una pregunta' });
+    }
+    for (const p of preguntas) {
+      if (!p.texto || !p.texto.trim()) {
+        return res.status(400).json({ error: 'Todas las preguntas deben tener texto' });
+      }
+      if (!Array.isArray(p.opciones) || p.opciones.length < 2) {
+        return res.status(400).json({ error: `La pregunta "${p.texto}" debe tener al menos 2 opciones` });
+      }
+      if (!p.opciones.some(o => o.esCorrecta)) {
+        return res.status(400).json({ error: `La pregunta "${p.texto}" debe tener una respuesta correcta` });
+      }
     }
 
     const cuestionario = await prisma.cuestionario.create({
@@ -297,6 +309,9 @@ export async function login(req, res) {
 
     if (!dni || !dni.trim()) {
       return res.status(400).json({ error: 'DNI requerido' });
+    }
+    if (!DNI_REGEX.test(dni.trim())) {
+      return res.status(400).json({ error: 'El DNI debe contener entre 7 y 8 dígitos numéricos' });
     }
 
     const cuestionario = await prisma.cuestionario.findUnique({

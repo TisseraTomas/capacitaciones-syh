@@ -18,7 +18,12 @@
     </div>
 
     <div class="card">
+      <div v-if="cargandoDatos" class="flex items-center justify-center py-12 text-slate-400">
+        <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        <span>Cargando empresas...</span>
+      </div>
       <DataTable
+        v-else
         :columns="[
           { key: 'nombre', label: 'Nombre' },
           { key: 'trabajadores', label: 'Trabajadores' },
@@ -47,7 +52,7 @@
         <form @submit.prevent="handleCreate">
           <div class="mb-4">
             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
-            <input v-model="form.nombre" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+            <input v-model="form.nombre" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required minlength="2" />
           </div>
           <p v-if="error" class="text-red-500 text-sm mb-3">{{ error }}</p>
           <div class="flex justify-end gap-3">
@@ -67,9 +72,14 @@ import { ref, onMounted, watch } from 'vue'
 import api from '../../composables/useApi'
 import DataTable from '../../components/admin/DataTable.vue'
 
+import { useToast } from '../../composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
+
 const empresas = ref([])
 const showModal = ref(false)
 const loading = ref(false)
+const cargandoDatos = ref(true)
 const error = ref('')
 const form = ref({ nombre: '' })
 const busqueda = ref('')
@@ -93,8 +103,10 @@ async function handleCreate() {
     showModal.value = false
     form.value.nombre = ''
     await load()
+    toastSuccess('Empresa creada correctamente')
   } catch (e) {
     error.value = e.message
+    toastError(e.message)
   } finally {
     loading.value = false
   }
@@ -105,10 +117,17 @@ async function confirmDelete(row) {
   try {
     await api.delete(`/admin/empresas/${row.id}`)
     await load()
+    toastSuccess('Empresa eliminada')
   } catch (e) {
-    alert(e.message)
+    toastError(e.message)
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    await load()
+  } finally {
+    cargandoDatos.value = false
+  }
+})
 </script>
