@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Empresa {
+  id        Int           @id @default(autoincrement())
+  nombre    String
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  trabajadores Trabajador[]
+  cuestionarios  Cuestionario[]
+
+  @@map("empresas")
+}
+
+model Trabajador {
+  id             Int       @id @default(autoincrement())
+  nombreCompleto String    @map("nombre_completo")
+  dni            String    @unique
+  empresaId      Int       @map("empresa_id")
+  empresa        Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  intentos       Intento[]
+
+  @@map("trabajadores")
+}
+
+model Cuestionario {
+  id                   Int          @id @default(autoincrement())
+  titulo               String
+  descripcion          String?
+  porcentajeAprobacion Float        @map("porcentaje_aprobacion")
+  intentosPermitidos   Int          @default(1) @map("intentos_permitidos")
+  urlToken             String       @unique @default(uuid()) @map("url_token")
+  empresaId            Int          @map("empresa_id")
+  empresa              Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  activo               Boolean      @default(true)
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  preguntas            Pregunta[]
+  intentos             Intento[]
+
+  @@map("cuestionarios")
+}
+
+model Pregunta {
+  id             Int       @id @default(autoincrement())
+  cuestionarioId Int       @map("cuestionario_id")
+  cuestionario   Cuestionario @relation(fields: [cuestionarioId], references: [id], onDelete: Cascade)
+  texto          String
+  tipo           String
+  orden          Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  opciones       Opcion[]
+  respuestas     Respuesta[]
+
+  @@map("preguntas")
+}
+
+model Opcion {
+  id         Int      @id @default(autoincrement())
+  preguntaId Int      @map("pregunta_id")
+  pregunta   Pregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  texto      String
+  esCorrecta Boolean  @map("es_correcta")
+  createdAt  DateTime @default(now()) @map("created_at")
+  respuestas Respuesta[]
+
+  @@map("opciones")
+}
+
+model Intento {
+  id             Int         @id @default(autoincrement())
+  trabajadorId   Int         @map("trabajador_id")
+  trabajador     Trabajador  @relation(fields: [trabajadorId], references: [id], onDelete: Cascade)
+  cuestionarioId Int         @map("cuestionario_id")
+  cuestionario   Cuestionario @relation(fields: [cuestionarioId], references: [id], onDelete: Cascade)
+  puntaje        Float?
+  aprobado       Boolean?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  respuestas     Respuesta[]
+
+  @@map("intentos")
+}
+
+model Respuesta {
+  id         Int      @id @default(autoincrement())
+  intentoId  Int      @map("intento_id")
+  intento    Intento  @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+  preguntaId Int      @map("pregunta_id")
+  pregunta   Pregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  opcionId   Int      @map("opcion_id")
+  opcion     Opcion   @relation(fields: [opcionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("respuestas")
+}
